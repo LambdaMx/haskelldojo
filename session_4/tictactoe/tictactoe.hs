@@ -1,47 +1,72 @@
 
-import Data.List.Split as S
+import Data.List
+import Data.List.Split as Split
+import Text.Regex
+import Data.Maybe
 
-type Board = [[Int]]
+type Board = [[Char]]
 
 newBoard :: Board
-newBoard = [[0,0,0],[0,0,0],[0,0,0]]
+newBoard = [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']]
 
-value :: Board -> Int -> Int -> Int
-value board row column = board !! row !! column
+showBoard :: Board -> IO()
+showBoard board = mapM_ putStrLn $ intersperse "-----" $ map (\r -> intersperse '|' r) board 
+
+val :: Board -> Int -> Int -> Char
+val board row col = board !! row !! col
+
+sym :: Int -> Char
+sym player
+  | player == 1 = 'x'
+  | player == 2 = 'o'
+
+otherPlayer :: Int -> Int
+otherPlayer player
+  | player == 1 = 2
+  | player == 2 = 1
 
 isValidMovement :: Board -> Int -> Int -> Bool
-isValidMovement board row column = value board row column  == 0 
+isValidMovement board row col = (val board row col) == ' '
 
-setMovement :: Board -> Int -> Int -> Int -> Board
-setMovement board row column player = (take row board) ++ [(substitute (board !! row) column player)] ++ drop (row + 1) board
-                               where substitute row column player = (take column row) ++ [player] ++ drop (column + 1) row
-
-winByRow :: Board -> Int -> Bool
-winByRow board player  = any (\row -> all (== player) row) board
-
-winByColumn :: Board -> Int -> Bool
-winByColumn board player  = any (\row -> all (== player) row) (zipWith3 (\x y z -> [x,y,z]) (board !! 0) (board !! 1) (board !! 2))
-
-winByDiag :: Board -> Int -> Bool
-winByDiag board player = any (\row -> all (== player) row) [[value board 0 0, value board 1 1, value board 2 2], [value board 0 2, value board 1 1, value board 2 0]]
+doMovement :: Board -> Int -> Int -> Int -> Maybe Board
+doMovement board row col player 
+  | isValidMovement board row col = Just $ (take row board) ++ [(substitute (board !! row) col player)] ++ drop (row + 1) board
+  | otherwise                     = Nothing
+    where substitute row col player = (take col row) ++ [sym player] ++ drop (col + 1) row
 
 isWinner :: Board -> Int -> Bool
-isWinner board player = winByRow board player || winByColumn board player || winByDiag board player
+isWinner board player           = winByRow  board player || 
+                                  winByCol  board player ||
+                                  winByDiag board player
+  where winByRow  board player  = anyRowEqualTo board             player
+        winByCol  board player  = anyRowEqualTo (transpose board) player
+        winByDiag board player  = anyRowEqualTo diagLines         player
+        anyRowEqualTo board player = any (\row -> all (== sym player) row) board
+        transpose board            = (zipWith3 (\x y z -> [x,y,z]) (board !! 0) (board !! 1) (board !! 2))
+        diagLines                  = [[val board 0 0, val board 1 1, val board 2 2], 
+                                      [val board 0 2, val board 1 1, val board 2 0]]
 
-getMovement :: IO (Int, Int)
-getMovement = do line <- getLine
-                 let (row:col:[]) = S.splitOn " " line
-                 return (read row ::Int, read col :: Int)
+getMovement :: Int -> IO (Int, Int)
+getMovement player = do putStrLn $ "Your turn player " ++ show player ++ ":"
+                        line <- getLine
+                        if correctInput line
+                        then do let (row:col:[]) = Split.splitOn "," line
+                                return (read row ::Int, read col :: Int)
+                        else do putStrLn "Wrong movement! Try again:"
+                                getMovement player
+  where correctInput input = isJust $ matchRegex (mkRegex "^[012],[012]$") input
 
-nuevaFuncion uno dos =  uno + dos 
-
---play :: IO ()
---play player = do movement <- getMovement
---                 putStrLn "movement for " ++ show player
---                 play (if player == 1 then 2 else 1) 
-
---main :: IO ()
---main = do let board = newBoard
---          play 1
-
-
+play :: Board -> Int -> IO ()
+play board player = do showBoard board
+                       movement <- getMovement player
+                       let updatedBoard = doMovement board (fst movement) (snd movement) player
+                       case updatedBoard of
+                         Just board -> if isWinner board player 
+                                       then do showBoard board
+                                               putStrLn $ "You won player " ++ show player ++ " !!!"
+                                               return ()
+                                       else play board $ otherPlayer player
+                         Nothing    -> do putStrLn "Wrong movement. Try again !!!"
+                                          play board player
+main :: IO ()
+main = do play newBoard 1 
