@@ -38,9 +38,9 @@ isWinner :: Board -> Int -> Bool
 isWinner board player           = winByRow  board player || 
                                   winByCol  board player ||
                                   winByDiag board player
-  where winByRow  board player  = anyRowEqualTo board             player
-        winByCol  board player  = anyRowEqualTo (transpose board) player
-        winByDiag board player  = anyRowEqualTo diagLines         player
+  where winByRow  board player     = anyRowEqualTo board             player
+        winByCol  board player     = anyRowEqualTo (transpose board) player
+        winByDiag board player     = anyRowEqualTo diagLines         player
         anyRowEqualTo board player = any (\row -> all (== sym player) row) board
         transpose board            = (zipWith3 (\x y z -> [x,y,z]) (board !! 0) (board !! 1) (board !! 2))
         diagLines                  = [[val board 0 0, val board 1 1, val board 2 2], 
